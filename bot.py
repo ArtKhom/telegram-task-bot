@@ -63,14 +63,14 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 router = Router()
 scheduler = AsyncIOScheduler(timezone=TIMEZONE)
-claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+claude = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
 
 
 def get_now():
     return datetime.now(TZ)
 
 
-def parse_message_with_ai(user_text, current_time, active_tasks):
+async def parse_message_with_ai(user_text, current_time, active_tasks):
     tasks_list = ""
     if active_tasks:
         tasks_list = "\n".join(
@@ -80,7 +80,7 @@ def parse_message_with_ai(user_text, current_time, active_tasks):
     else:
         tasks_list = "  (no active tasks)"
 
-    response = claude.messages.create(
+    response = await claude.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=500,
         system=f"""You are a task manager AI. Current time: {current_time}. Timezone: {TIMEZONE}.
@@ -425,7 +425,7 @@ async def handle_text(message: Message):
     try:
         now = get_now().strftime("%Y-%m-%d %H:%M, %A")
         active_tasks = db.get_active_tasks(user_id)
-        parsed = parse_message_with_ai(user_text, now, active_tasks)
+        parsed = await parse_message_with_ai(user_text, now, active_tasks)y
         intent = parsed.get("intent", "create")
 
         if intent == "create":
