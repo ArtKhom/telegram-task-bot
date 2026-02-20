@@ -28,6 +28,8 @@ TIMEZONE = os.getenv("TIMEZONE", "Europe/Kyiv")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "")  # Public Railway URL
 PORT = int(os.getenv("PORT", 8080))
 TZ = ZoneInfo(TIMEZONE)
+# Тимчасове сховище для задач без дати
+pending_tasks = {}
 
 # ─── Categories ───────────────────────────────────────────────────
 CATEGORIES = {
