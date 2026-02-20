@@ -492,9 +492,16 @@ async def handle_text(message: Message, custom_text: str = None):
         elif intent == "list":
             await cmd_tasks(message)
 
-        elif intent == "chat":
-            response_text = parsed.get("response", "Не зрозумів, спробуй ще раз.")
-            await message.answer(response_text)
+      elif intent == "chat":
+            response_text = parsed.get("response", "")
+            
+            # Якщо AI надіслав код очікування часу (напр. "WAIT_TIME:купити банани")
+            if "WAIT_TIME:" in response_text:
+                task_title = response_text.split("WAIT_TIME:")[1].strip()
+                pending_tasks[message.from_user.id] = task_title # Кладемо в пам'ять
+                await message.answer(f"📝 Записав: «{task_title}»\n\nНа який час або дату поставити нагадування?")
+            else:
+                await message.answer(response_text)
 
     except json.JSONDecodeError:
         await message.answer(
