@@ -1,4 +1,4 @@
 aiogram==3.13.1
 anthropic==0.42.0
 apscheduler==3.10.4
-aiohttp==3.11.11
+aiohttp==3.10.11
