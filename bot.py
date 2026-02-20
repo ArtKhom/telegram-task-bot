@@ -495,6 +495,8 @@ async def handle_text(message: Message, custom_text: str = None):
 
       elif intent == "chat":
             response_text = parsed.get("response", "")
+            # --- ДОДАЙТЕ ЦЕЙ РЯДОК НИЖЧЕ ---
+            logger.info(f"DEBUG: AI отримав текст: {user_text} | Відповідь AI: {response_text}")
             
             # Якщо AI надіслав код очікування часу (напр. "WAIT_TIME:купити банани")
             if "WAIT_TIME:" in response_text:
