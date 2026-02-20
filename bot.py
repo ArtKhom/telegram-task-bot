@@ -2,6 +2,8 @@ import os
 import json
 import logging
 import asyncio
+import traceback
+import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -31,16 +33,16 @@ pending_tasks = {}
 
 # --- Categories ---
 CATEGORIES = {
-    "work":      {"name": "Робота",     "emoji": "\U0001f4bc", "color": "#3B82F6"},
-    "home":      {"name": "Побут",      "emoji": "\U0001f3e0", "color": "#10B981"},
-    "hobby":     {"name": "Хоббі",     "emoji": "\U0001f3ae", "color": "#F59E0B"},
-    "ai":        {"name": "AI",         "emoji": "\U0001f916", "color": "#8B5CF6"},
-    "finance":   {"name": "Фінанси",   "emoji": "\U0001f4b0", "color": "#EF4444"},
-    "health":    {"name": "Здоров'я",   "emoji": "\U0001f3cb\ufe0f", "color": "#EC4899"},
-    "education": {"name": "Навчання",   "emoji": "\U0001f4da", "color": "#06B6D4"},
-    "travel":    {"name": "Подорожі",   "emoji": "\u2708\ufe0f", "color": "#F97316"},
-    "social":    {"name": "Соціальне",  "emoji": "\U0001f465", "color": "#14B8A6"},
-    "personal":  {"name": "Особисте",   "emoji": "\U0001f4cb", "color": "#6366F1"},
+    "work":      {"name": "Робота",     "emoji": "💼", "color": "#3B82F6"},
+    "home":      {"name": "Побут",      "emoji": "🏠", "color": "#10B981"},
+    "hobby":     {"name": "Хоббі",     "emoji": "🎮", "color": "#F59E0B"},
+    "ai":        {"name": "AI",         "emoji": "🤖", "color": "#8B5CF6"},
+    "finance":   {"name": "Фінанси",   "emoji": "💰", "color": "#EF4444"},
+    "health":    {"name": "Здоров'я",   "emoji": "🏋️", "color": "#EC4899"},
+    "education": {"name": "Навчання",   "emoji": "📚", "color": "#06B6D4"},
+    "travel":    {"name": "Подорожі",   "emoji": "✈️", "color": "#F97316"},
+    "social":    {"name": "Соціальне",  "emoji": "👥", "color": "#14B8A6"},
+    "personal":  {"name": "Особисте",   "emoji": "📋", "color": "#6366F1"},
 }
 
 REMINDER_PRESETS = {
@@ -182,20 +184,20 @@ def format_reminders_text(remind_minutes_list):
 async def cmd_start(message: Message):
     db.ensure_user(message.from_user.id)
     text = (
-        "\U0001f44b Привіт! Я твій AI-менеджер задач.\n\n"
+        "👋 Привіт! Я твій AI-менеджер задач.\n\n"
         "Просто напиши задачу:\n"
-        "\u2022 \u00abЗателефонувати лікарю завтра о 10\u00bb\n"
-        "\u2022 \u00abКупити молоко в п'ятницю\u00bb\n"
-        "\u2022 \u00abробота: звіт до понеділка\u00bb\n\n"
-        "Якщо не вкажеш час \u2014 я запитаю!\n\n"
+        "• «Зателефонувати лікарю завтра о 10»\n"
+        "• «Купити молоко в п'ятницю»\n"
+        "• «робота: звіт до понеділка»\n\n"
+        "Якщо не вкажеш час — я запитаю!\n\n"
         "Команди:\n"
-        "/tasks \u2014 список задач\n"
-        "/dashboard \u2014 дашборд\n"
-        "/help \u2014 допомога"
+        "/tasks — список задач\n"
+        "/dashboard — дашборд\n"
+        "/help — допомога"
     )
     if WEBAPP_URL:
         kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="\U0001f4ca Відкрити дашборд", web_app=WebAppInfo(url=WEBAPP_URL))
+            InlineKeyboardButton(text="📊 Відкрити дашборд", web_app=WebAppInfo(url=WEBAPP_URL))
         ]])
         await message.answer(text, reply_markup=kb)
     else:
@@ -206,19 +208,19 @@ async def cmd_start(message: Message):
 async def cmd_help(message: Message):
     cats = "\n".join(f"  {v['emoji']} {v['name']}" for v in CATEGORIES.values())
     await message.answer(
-        f"\U0001f4dd <b>Як мною користуватись:</b>\n\n"
-        f"Пиши задачу текстом \u2014 я сам визначу категорію і дату.\n"
-        f"Якщо не вкажеш час \u2014 запитаю кнопками.\n\n"
+        f"📝 <b>Як мною користуватись:</b>\n\n"
+        f"Пиши задачу текстом — я сам визначу категорію і дату.\n"
+        f"Якщо не вкажеш час — запитаю кнопками.\n\n"
         f"<b>Розумні нагадування:</b>\n"
-        f"  \U0001f3a4 Концерт/подія \u2192 за 1 день, 2 год, 30 хв\n"
-        f"  \U0001f4bc Зустріч \u2192 за 1 год, 15 хв\n"
-        f"  \U0001f6d2 Побутове \u2192 за 30 хв\n\n"
+        f"  🎤 Концерт/подія → за 1 день, 2 год, 30 хв\n"
+        f"  💼 Зустріч → за 1 год, 15 хв\n"
+        f"  🛒 Побутове → за 30 хв\n\n"
         f"<b>Категорії:</b>\n{cats}\n\n"
         f"<b>Команди:</b>\n"
-        f"/tasks \u2014 активні задачі\n"
-        f"/done \u2014 завершені\n"
-        f"/dashboard \u2014 дашборд\n"
-        f"/clear \u2014 видалити завершені",
+        f"/tasks — активні задачі\n"
+        f"/done — завершені\n"
+        f"/dashboard — дашборд\n"
+        f"/clear — видалити завершені",
         parse_mode=ParseMode.HTML
     )
 
@@ -227,25 +229,25 @@ async def cmd_help(message: Message):
 async def cmd_dashboard(message: Message):
     if WEBAPP_URL:
         kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="\U0001f4ca Відкрити дашборд", web_app=WebAppInfo(url=WEBAPP_URL))
+            InlineKeyboardButton(text="📊 Відкрити дашборд", web_app=WebAppInfo(url=WEBAPP_URL))
         ]])
         await message.answer("Натисни кнопку:", reply_markup=kb)
     else:
-        await message.answer("\u26a0\ufe0f Дашборд не налаштований. Додай WEBAPP_URL.")
+        await message.answer("⚠️ Дашборд не налаштований. Додай WEBAPP_URL.")
 
 
 @router.message(Command("tasks"))
 async def cmd_tasks(message: Message):
     tasks = db.get_active_tasks(message.from_user.id)
     if not tasks:
-        await message.answer("\u2705 Задач немає. Напиши мені нову!")
+        await message.answer("✅ Задач немає. Напиши мені нову!")
         return
-    text = "\U0001f4cb <b>Твої задачі:</b>\n\n"
+    text = "📋 <b>Твої задачі:</b>\n\n"
     for t in tasks:
         cat = CATEGORIES.get(t.get("category","personal"), CATEGORIES["personal"])
         overdue = datetime.strptime(t["due_date"],"%Y-%m-%d %H:%M").replace(tzinfo=TZ) < get_now()
-        s = "\U0001f534" if overdue else "\U0001f7e1"
-        text += f"{s} {cat['emoji']} <b>{t['title']}</b>\n   \U0001f4c5 {t['due_date']}\n   /del_{t['id']}\n\n"
+        s = "🔴" if overdue else "🟡"
+        text += f"{s} {cat['emoji']} <b>{t['title']}</b>\n   📅 {t['due_date']}\n   /del_{t['id']}\n\n"
     await message.answer(text, parse_mode=ParseMode.HTML)
 
 
@@ -255,17 +257,17 @@ async def cmd_done(message: Message):
     if not tasks:
         await message.answer("Поки немає завершених задач.")
         return
-    text = "\u2705 <b>Завершені:</b>\n\n"
+    text = "✅ <b>Завершені:</b>\n\n"
     for t in tasks:
         cat = CATEGORIES.get(t.get("category","personal"), CATEGORIES["personal"])
-        text += f"\u2022 {cat['emoji']} <s>{t['title']}</s> ({t['due_date']})\n"
+        text += f"• {cat['emoji']} <s>{t['title']}</s> ({t['due_date']})\n"
     await message.answer(text, parse_mode=ParseMode.HTML)
 
 
 @router.message(Command("clear"))
 async def cmd_clear(message: Message):
     db.clear_done_tasks(message.from_user.id)
-    await message.answer("\U0001f5d1 Завершені задачі видалено.")
+    await message.answer("🗑 Видалено завершені задачі.")
 
 
 @router.message(F.text.startswith("/del_"))
@@ -276,7 +278,7 @@ async def cmd_delete_task(message: Message):
         if task:
             db.mark_done(task_id)
             remove_all_reminders(task_id)
-            await message.answer(f"\u2705 \u00ab{task['title']}\u00bb \u2014 завершено!")
+            await message.answer(f"✅ «{task['title']}» — завершено!")
         else:
             await message.answer("Задачу не знайдено.")
     except (ValueError, IndexError):
@@ -291,7 +293,7 @@ async def cb_done(callback: CallbackQuery):
     if task:
         db.mark_done(task_id)
         remove_all_reminders(task_id)
-        await callback.message.edit_text(f"\u2705 \u00ab{task['title']}\u00bb \u2014 завершено!", parse_mode=ParseMode.HTML)
+        await callback.message.edit_text(f"✅ «{task['title']}» — завершено!", parse_mode=ParseMode.HTML)
     await callback.answer()
 
 
@@ -302,7 +304,7 @@ async def cb_snooze(callback: CallbackQuery):
     if task:
         new_time = get_now() + timedelta(minutes=30)
         schedule_single_reminder(task_id, callback.from_user.id, task["title"], new_time, "snooze")
-        await callback.message.edit_text(f"\u23f0 \u00ab{task['title']}\u00bb \u2014 нагадаю через 30 хв", parse_mode=ParseMode.HTML)
+        await callback.message.edit_text(f"⏰ «{task['title']}» — нагадаю через 30 хв", parse_mode=ParseMode.HTML)
     await callback.answer()
 
 
@@ -316,7 +318,7 @@ async def cb_time_select(callback: CallbackQuery):
     data = callback.data
     if data == "time:custom":
         await callback.message.edit_text(
-            "\u23f0 Напиши час, наприклад: <b>14:30</b> або <b>10:00</b>",
+            "⏰ Напиши час, наприклад: <b>14:30</b> або <b>10:00</b>",
             parse_mode=ParseMode.HTML
         )
         await callback.answer()
@@ -339,11 +341,11 @@ async def send_reminder(task_id, user_id, title):
         return
     cat = CATEGORIES.get(task.get("category","personal"), CATEGORIES["personal"])
     kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="\u2705 Готово", callback_data=f"done:{task_id}"),
-        InlineKeyboardButton(text="\u23f0 +30 хв", callback_data=f"snooze:{task_id}"),
+        InlineKeyboardButton(text="✅ Готово", callback_data=f"done:{task_id}"),
+        InlineKeyboardButton(text="⏰ +30 хв", callback_data=f"snooze:{task_id}"),
     ]])
     await bot.send_message(user_id,
-        f"\U0001f514 <b>Нагадування!</b>\n\n{cat['emoji']} {title}\n\U0001f4c5 {task['due_date']}",
+        f"🔔 <b>Нагадування!</b>\n\n{cat['emoji']} {title}\n📅 {task['due_date']}",
         parse_mode=ParseMode.HTML, reply_markup=kb)
 
 
@@ -387,8 +389,8 @@ async def save_and_confirm_task(user_id, title, due_date, category, task_type, o
     schedule_smart_reminders(task_id, user_id, title, due_dt, task_type)
 
     remind_text = format_reminders_text(remind_minutes)
-    confirm = (f"\u2705 <b>Задачу збережено!</b>\n\n"
-        f"{cat['emoji']} {title}\n\U0001f4c5 {due_date}\n\U0001f3f7 {cat['name']}\n\U0001f514 Нагадаю за: {remind_text}")
+    confirm = (f"✅ <b>Задачу збережено!</b>\n\n"
+        f"{cat['emoji']} {title}\n📅 {due_date}\n🏷 {cat['name']}\n🔔 Нагадаю за: {remind_text}")
 
     if isinstance(msg_or_cb, CallbackQuery):
         await msg_or_cb.message.edit_text(confirm, parse_mode=ParseMode.HTML)
@@ -408,7 +410,6 @@ async def handle_text(message: Message):
 
     # Check if user typing custom time for pending task
     if user_id in pending_tasks:
-        import re
         time_match = re.match(r'^(\d{1,2})[:\.](\d{2})$', user_text.strip())
         if time_match:
             hour = int(time_match.group(1))
@@ -430,11 +431,12 @@ async def handle_text(message: Message):
 
         if intent == "create":
             title = parsed.get("title")
-        due_date = parsed.get("due_date")
-        
-        if not title or not due_date:
-            await message.answer("❌ Я не зміг розпізнати задачу або дату. Напиши, будь ласка, повнісінько (наприклад: «Купити банани завтра о 12:30»).")
-            return
+            due_date = parsed.get("due_date")
+            
+            if not title or not due_date:
+                await message.answer("❌ Я не зміг розпізнати задачу або дату. Напиши, будь ласка, повнісінько (наприклад: «Купити банани завтра о 12:30»).")
+                return
+            
             category = parsed.get("category", "personal")
             task_type = parsed.get("task_type", "default")
             time_specified = parsed.get("time_specified", True)
@@ -450,14 +452,14 @@ async def handle_text(message: Message):
                     "task_type": task_type, "original_text": user_text,
                 }
                 kb = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="\U0001f305 09:00", callback_data="time:9:0"),
-                     InlineKeyboardButton(text="\u2600\ufe0f 12:00", callback_data="time:12:0")],
-                    [InlineKeyboardButton(text="\U0001f307 15:00", callback_data="time:15:0"),
-                     InlineKeyboardButton(text="\U0001f319 19:00", callback_data="time:19:0")],
-                    [InlineKeyboardButton(text="\u270f\ufe0f Свій час", callback_data="time:custom")],
+                    [InlineKeyboardButton(text="🌅 09:00", callback_data="time:9:0"),
+                     InlineKeyboardButton(text="☀️ 12:00", callback_data="time:12:0")],
+                    [InlineKeyboardButton(text="🌇 15:00", callback_data="time:15:0"),
+                     InlineKeyboardButton(text="🌙 19:00", callback_data="time:19:0")],
+                    [InlineKeyboardButton(text="✏️ Свій час", callback_data="time:custom")],
                 ])
                 await message.answer(
-                    f"\U0001f4dd <b>{title}</b>\n\U0001f4c5 {date_part}\n\U0001f3f7 {cat['name']}\n\n\u23f0 На яку годину?",
+                    f"📝 <b>{title}</b>\n📅 {date_part}\n🏷 {cat['name']}\n\n⏰ На яку годину?",
                     parse_mode=ParseMode.HTML, reply_markup=kb)
                 return
 
@@ -473,9 +475,9 @@ async def handle_text(message: Message):
                     remove_all_reminders(tid)
                     completed.append(task["title"])
             if completed:
-                await message.answer(f"\u2705 Завершено: {', '.join(f'\u00ab{n}\u00bb' for n in completed)}")
+                await message.answer(f"✅ Завершено: {', '.join(f'«{n}»' for n in completed)}")
             else:
-                await message.answer("\U0001f914 Не знайшов таких задач.")
+                await message.answer("🤔 Не знайшов таких задач.")
 
         elif intent == "complete_all":
             tasks = db.get_active_tasks(user_id)
@@ -483,9 +485,9 @@ async def handle_text(message: Message):
                 for t in tasks:
                     db.mark_done(t["id"])
                     remove_all_reminders(t["id"])
-                await message.answer(f"\u2705 Всі {len(tasks)} задач завершено!")
+                await message.answer(f"✅ Всі {len(tasks)} задач завершено!")
             else:
-                await message.answer("\u2705 У тебе і так немає активних задач.")
+                await message.answer("✅ У тебе і так немає активних задач.")
 
         elif intent == "delete":
             task_ids = parsed.get("task_ids", [])
@@ -497,9 +499,9 @@ async def handle_text(message: Message):
                     remove_all_reminders(tid)
                     deleted.append(task["title"])
             if deleted:
-                await message.answer(f"\U0001f5d1 Видалено: {', '.join(f'\u00ab{n}\u00bb' for n in deleted)}")
+                await message.answer(f"🗑 Видалено: {', '.join(f'«{n}»' for n in deleted)}")
             else:
-                await message.answer("\U0001f914 Не знайшов таких задач.")
+                await message.answer("🤔 Не знайшов таких задач.")
 
         elif intent == "delete_all":
             tasks = db.get_active_tasks(user_id)
@@ -507,7 +509,7 @@ async def handle_text(message: Message):
                 for t in tasks:
                     db.delete_task(t["id"], user_id)
                     remove_all_reminders(t["id"])
-                await message.answer(f"\U0001f5d1 Видалено всі {len(tasks)} задач.")
+                await message.answer(f"🗑 Видалено всі {len(tasks)} задач.")
             else:
                 await message.answer("У тебе немає активних задач.")
 
@@ -518,10 +520,10 @@ async def handle_text(message: Message):
             await message.answer(parsed.get("response", "Не зрозумів."))
 
     except json.JSONDecodeError:
-        await message.answer("\U0001f914 Не зміг розпарсити. Спробуй: \u00abЗустріч завтра о 14:00\u00bb")
+        await message.answer("🤔 Не зміг розпарсити. Спробуй: «Зустріч завтра о 14:00»")
     except Exception as e:
-        logger.error(f"Error: {e}")
-        await message.answer("\u274c Щось пішло не так. Спробуй ще раз.")
+        logger.error(f"Error details:\n{traceback.format_exc()}")
+        await message.answer("❌ Щось пішло не так. Зачекай хвилинку і спробуй ще раз (можливо AI перезавантажений).")
 
 
 # --- Reschedule on startup ---
