@@ -385,7 +385,7 @@ async def handle_text(message: Message, custom_text: str = None):
     user_id = message.from_user.id
     if user_id in pending_tasks:
         old_title = pending_tasks.pop(user_id)
-        user_text = f"{old_title} {user_text}"
+        user_text = f"{old_title} на {user_text}"
         logger.info(f"Об'єднано задачу: {user_text}")
 
     if not user_text or user_text.startswith("/"):
