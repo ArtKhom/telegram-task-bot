@@ -425,7 +425,7 @@ async def handle_text(message: Message):
     try:
         now = get_now().strftime("%Y-%m-%d %H:%M, %A")
         active_tasks = db.get_active_tasks(user_id)
-        parsed = await parse_message_with_ai(user_text, now, active_tasks)y
+        parsed = await parse_message_with_ai(user_text, now, active_tasks)
         intent = parsed.get("intent", "create")
 
         if intent == "create":
