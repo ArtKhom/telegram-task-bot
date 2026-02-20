@@ -429,8 +429,12 @@ async def handle_text(message: Message):
         intent = parsed.get("intent", "create")
 
         if intent == "create":
-            title = parsed["title"]
-            due_date = parsed["due_date"]
+            title = parsed.get("title")
+        due_date = parsed.get("due_date")
+        
+        if not title or not due_date:
+            await message.answer("❌ Я не зміг розпізнати задачу або дату. Напиши, будь ласка, повнісінько (наприклад: «Купити банани завтра о 12:30»).")
+            return
             category = parsed.get("category", "personal")
             task_type = parsed.get("task_type", "default")
             time_specified = parsed.get("time_specified", True)
