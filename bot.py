@@ -380,6 +380,12 @@ def schedule_reminder(task_id: int, user_id: int, title: str, remind_at: datetim
 async def handle_text(message: Message, custom_text: str = None):
     db.ensure_user(message.from_user.id)
     user_text = custom_text if custom_text else message.text.strip()
+    # ПЕРЕВІРКА ПАМ'ЯТІ: чи є збережена задача для цього користувача?
+    user_id = message.from_user.id
+    if user_id in pending_tasks:
+        old_title = pending_tasks.pop(user_id)
+        user_text = f"{old_title} {user_text}"
+        logger.info(f"Об'єднано задачу: {user_text}")
 
     if not user_text or user_text.startswith("/"):
         return
