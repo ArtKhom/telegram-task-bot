@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Посіпака — Дашборд</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--tg-theme-bg-color, #0F172A);
+  color: var(--tg-theme-text-color, #E2E8F0);
+  min-height: 100vh;
+  padding: 12px;
+  padding-bottom: 80px;
+}
+
+.header { text-align: center; margin-bottom: 16px; }
+.header h1 { font-size: 24px; font-weight: 700; }
+.header .sub { font-size: 12px; color: var(--tg-theme-hint-color, #94A3B8); margin-top: 2px; }
+
+/* Stats Grid */
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+.stat-card {
+  border-radius: 12px; padding: 12px; cursor: pointer;
+  transition: all 0.2s; border: 2px solid transparent;
+  background: var(--tg-theme-secondary-bg-color, #1E293B);
+}
+.stat-card.active { border-color: var(--cat-color); }
+.stat-emoji { font-size: 20px; margin-bottom: 4px; }
+.stat-name { font-size: 12px; color: var(--tg-theme-hint-color, #94A3B8); }
+.stat-count { font-size: 22px; font-weight: 700; }
+.stat-total { font-size: 12px; color: var(--tg-theme-hint-color, #64748B); font-weight: 400; }
+
+/* Filter pills */
+.filters {
+  display: flex; gap: 6px; margin-bottom: 14px;
+  overflow-x: auto; padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.filters::-webkit-scrollbar { display: none; }
+.pill {
+  padding: 6px 12px; border-radius: 20px; border: 1.5px solid transparent;
+  background: var(--tg-theme-secondary-bg-color, #1E293B);
+  color: var(--tg-theme-hint-color, #94A3B8);
+  font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;
+  transition: all 0.2s;
+}
+.pill.active {
+  color: var(--cat-color, #fff);
+  border-color: var(--cat-color, #fff);
+}
+
+/* Section headers */
+.section-title {
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 8px;
+  color: var(--tg-theme-hint-color, #94A3B8);
+}
+
+/* Task cards */
+.task {
+  background: var(--tg-theme-secondary-bg-color, #1E293B);
+  border-radius: 12px; padding: 12px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 10px;
+  border-left: 4px solid var(--cat-color, #6366F1);
+  position: relative; transition: all 0.2s;
+}
+.task.done-task {
+  opacity: 0.5; border-left-color: #334155;
+}
+
+.check {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--cat-color, #6366F1);
+  flex-shrink: 0; cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.check.checked {
+  background: #10B981; border-color: #10B981; color: #fff; font-size: 12px;
+}
+.task-info { flex: 1; min-width: 0; }
+.task-title { font-size: 14px; font-weight: 500; margin-bottom: 3px; }
+.task.done-task .task-title { text-decoration: line-through; color: var(--tg-theme-hint-color, #64748B); }
+.task-meta {
+  font-size: 11px; color: var(--tg-theme-hint-color, #64748B);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.task-meta.overdue { color: #EF4444; }
+.cat-badge {
+  padding: 1px 6px; border-radius: 8px; font-size: 10px;
+  background: color-mix(in srgb, var(--cat-color) 20%, transparent);
+  color: var(--cat-color);
+}
+
+.delete-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: transparent; border: none; color: #64748B;
+  font-size: 16px; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.delete-btn:hover { color: #EF4444; background: #1E293B; }
+
+.empty {
+  text-align: center; padding: 30px;
+  color: var(--tg-theme-hint-color, #475569); font-size: 14px;
+}
+
+.loading {
+  text-align: center; padding: 60px;
+  color: var(--tg-theme-hint-color, #94A3B8);
+}
+.loading .spinner {
+  width: 32px; height: 32px; border: 3px solid #334155;
+  border-top-color: #8B5CF6; border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.bottom-note {
+  text-align: center; padding: 16px;
+  color: #334155; font-size: 11px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📋 Посіпака</h1>
+  <div class="sub">Твій AI-менеджер задач</div>
+</div>
+
+<div id="loading" class="loading">
+  <div class="spinner"></div>
+  Завантажую задачі...
+</div>
+
+<div id="app" style="display:none">
+  <div class="stats" id="stats"></div>
+  <div class="filters" id="filters"></div>
+  <div id="active-section">
+    <div class="section-title" id="active-title">Активні — 0</div>
+    <div id="active-tasks"></div>
+  </div>
+  <div id="done-section" style="margin-top:20px">
+    <div class="section-title" id="done-title">Завершені — 0</div>
+    <div id="done-tasks"></div>
+  </div>
+  <div class="bottom-note">Натисни ◯ щоб завершити • ✕ щоб видалити</div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) tg.expand();
+
+const CATEGORIES = {
+  work:      { name: "Робота",    emoji: "💼", color: "#3B82F6" },
+  home:      { name: "Побут",     emoji: "🏠", color: "#10B981" },
+  hobby:     { name: "Хоббі",    emoji: "🎮", color: "#F59E0B" },
+  ai:        { name: "AI",        emoji: "🤖", color: "#8B5CF6" },
+  finance:   { name: "Фінанси",  emoji: "💰", color: "#EF4444" },
+  health:    { name: "Здоров'я",  emoji: "🏋️", color: "#EC4899" },
+  education: { name: "Навчання",  emoji: "📚", color: "#06B6D4" },
+  travel:    { name: "Подорожі",  emoji: "✈️", color: "#F97316" },
+  social:    { name: "Соціальне", emoji: "👥", color: "#14B8A6" },
+  personal:  { name: "Особисте",  emoji: "📋", color: "#6366F1" }
+};
+
+let tasks = [];
+let currentFilter = "all";
+let userId = null;
+
+// Get user ID from Telegram
+if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+  userId = tg.initDataUnsafe.user.id;
+} else {
+  // Fallback: try URL params
+  const params = new URLSearchParams(window.location.search);
+  userId = params.get("user_id");
+}
+
+async function fetchTasks() {
+  if (!userId) {
+    document.getElementById("loading").innerHTML = "⚠️ Відкрий через Telegram бота";
+    return;
+  }
+  try {
+    const res = await fetch(`/api/tasks?user_id=${userId}`);
+    const data = await res.json();
+    tasks = data.tasks || [];
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    render();
+  } catch (e) {
+    document.getElementById("loading").innerHTML = "❌ Помилка завантаження";
+  }
+}
+
+async function toggleTask(id) {
+  try {
+    await fetch(`/api/tasks/${id}/complete?user_id=${userId}`, { method: "POST" });
+    const task = tasks.find(t => t.id === id);
+    if (task) task.is_done = task.is_done ? 0 : 1;
+    render();
+  } catch (e) { console.error(e); }
+}
+
+async function deleteTask(id) {
+  if (!confirm("Видалити задачу?")) return;
+  try {
+    await fetch(`/api/tasks/${id}?user_id=${userId}`, { method: "DELETE" });
+    tasks = tasks.filter(t => t.id !== id);
+    render();
+  } catch (e) { console.error(e); }
+}
+
+function setFilter(f) {
+  currentFilter = currentFilter === f ? "all" : f;
+  render();
+}
+
+function render() {
+  const filtered = currentFilter === "all" ? tasks : tasks.filter(t => t.category === currentFilter);
+  const active = filtered.filter(t => !t.is_done);
+  const done = filtered.filter(t => t.is_done);
+  const now = new Date();
+
+  // Stats
+  const statsEl = document.getElementById("stats");
+  const catKeys = Object.keys(CATEGORIES);
+  // Show only top 4 categories by active task count, plus show active filter
+  const catCounts = catKeys.map(k => ({
+    key: k,
+    ...CATEGORIES[k],
+    active: tasks.filter(t => t.category === k && !t.is_done).length,
+    total: tasks.filter(t => t.category === k).length
+  })).sort((a, b) => b.active - a.active);
+
+  const topCats = catCounts.filter(c => c.total > 0).slice(0, 4);
+  if (topCats.length === 0) {
+    // Show default 4
+    topCats.push(...catCounts.slice(0, 4));
+  }
+
+  statsEl.innerHTML = topCats.map(c => `
+    <div class="stat-card ${currentFilter === c.key ? 'active' : ''}"
+         style="--cat-color:${c.color}" onclick="setFilter('${c.key}')">
+      <div class="stat-emoji">${c.emoji}</div>
+      <div class="stat-name">${c.name}</div>
+      <div class="stat-count" style="color:${c.color}">
+        ${c.active}<span class="stat-total"> / ${c.total}</span>
+      </div>
+    </div>
+  `).join("");
+
+  // Filter pills
+  const filtersEl = document.getElementById("filters");
+  const totalActive = tasks.filter(t => !t.is_done).length;
+  let pills = `<div class="pill ${currentFilter === 'all' ? 'active' : ''}"
+    style="--cat-color:#fff" onclick="setFilter('all')">Всі (${totalActive})</div>`;
+  catKeys.forEach(k => {
+    const c = CATEGORIES[k];
+    const cnt = tasks.filter(t => t.category === k && !t.is_done).length;
+    if (cnt > 0 || currentFilter === k) {
+      pills += `<div class="pill ${currentFilter === k ? 'active' : ''}"
+        style="--cat-color:${c.color}" onclick="setFilter('${k}')">${c.emoji} ${c.name}</div>`;
+    }
+  });
+  filtersEl.innerHTML = pills;
+
+  // Active tasks
+  document.getElementById("active-title").textContent = `Активні — ${active.length}`;
+  const activeEl = document.getElementById("active-tasks");
+  if (active.length === 0) {
+    activeEl.innerHTML = '<div class="empty">Немає задач ✨</div>';
+  } else {
+    activeEl.innerHTML = active.map(t => {
+      const cat = CATEGORIES[t.category] || CATEGORIES.personal;
+      const dueDate = new Date(t.due_date.replace(" ", "T"));
+      const overdue = dueDate < now;
+      return `
+        <div class="task" style="--cat-color:${cat.color}">
+          <div class="check" onclick="toggleTask(${t.id})"></div>
+          <div class="task-info">
+            <div class="task-title">${esc(t.title)}</div>
+            <div class="task-meta ${overdue ? 'overdue' : ''}">
+              ${overdue ? '🔴' : '📅'} ${t.due_date}
+              <span class="cat-badge" style="--cat-color:${cat.color}">${cat.emoji} ${cat.name}</span>
+            </div>
+          </div>
+          <div class="delete-btn" onclick="deleteTask(${t.id})">✕</div>
+        </div>`;
+    }).join("");
+  }
+
+  // Done tasks
+  const doneSection = document.getElementById("done-section");
+  if (done.length === 0) {
+    doneSection.style.display = "none";
+  } else {
+    doneSection.style.display = "block";
+    document.getElementById("done-title").textContent = `Завершені — ${done.length}`;
+    document.getElementById("done-tasks").innerHTML = done.map(t => {
+      const cat = CATEGORIES[t.category] || CATEGORIES.personal;
+      return `
+        <div class="task done-task" style="--cat-color:${cat.color}">
+          <div class="check checked" onclick="toggleTask(${t.id})">✓</div>
+          <div class="task-info">
+            <div class="task-title">${esc(t.title)}</div>
+            <div class="task-meta">📅 ${t.due_date}</div>
+          </div>
+          <div class="delete-btn" onclick="deleteTask(${t.id})">✕</div>
+        </div>`;
+    }).join("");
+  }
+}
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+fetchTasks();
+</script>
+</body>
+</html>
