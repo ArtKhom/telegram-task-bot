@@ -572,6 +572,66 @@ async def handle_dashboard(request):
     return web.FileResponse(html_path)
 
 
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+}
+
+
+async def handle_create_department_task(request):
+    if request.method == "OPTIONS":
+        return web.Response(headers=CORS_HEADERS)
+
+    try:
+        data = await request.json()
+        title = data.get("title", "").strip()
+        department = data.get("department", "").strip()
+        author = data.get("author", "Admin").strip()
+
+        if not title or not department:
+            return web.json_response(
+                {"error": "title and department are required"},
+                status=400, headers=CORS_HEADERS
+            )
+
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_KEY")
+
+        if not supabase_url or not supabase_key:
+            return web.json_response(
+                {"error": "Supabase not configured on server"},
+                status=500, headers=CORS_HEADERS
+            )
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{supabase_url}/rest/v1/tasks",
+                json={"title": title, "department": department, "author": author},
+                headers={
+                    "Authorization": f"Bearer {supabase_key}",
+                    "apikey": supabase_key,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                }
+            ) as resp:
+                result = await resp.json()
+                if resp.status in (200, 201):
+                    return web.json_response(
+                        {"success": True}, headers=CORS_HEADERS
+                    )
+                else:
+                    return web.json_response(
+                        {"error": str(result)}, status=400, headers=CORS_HEADERS
+                    )
+
+    except Exception as e:
+        logger.error(f"create_department_task error: {e}")
+        return web.json_response(
+            {"error": str(e)}, status=500, headers=CORS_HEADERS
+        )
+
+
 # --- Main ---
 async def main():
     db.init()
@@ -584,6 +644,8 @@ async def main():
     app.router.add_get("/api/tasks", handle_api_tasks)
     app.router.add_post("/api/tasks/{id}/complete", handle_api_complete)
     app.router.add_delete("/api/tasks/{id}", handle_api_delete)
+    app.router.add_post("/api/create-department-task", handle_create_department_task)
+    app.router.add_options("/api/create-department-task", handle_create_department_task)
 
     runner = web.AppRunner(app)
     await runner.setup()
