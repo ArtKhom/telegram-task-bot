@@ -136,9 +136,7 @@ function renderTasks(tasks) {
     html += '<div class="card-top"><span class="tag">' + t.department + '</span>';
     html += '<span class="status">' + (isDone ? 'Выполнено' : 'Активна') + '</span></div>';
     html += '<div class="title">' + t.title + '</div>';
-    html += '<div class="meta"><span>Создал: <b>' + t.author + '</b></span>';
-    if (t.last_modified_by) { html += '<span>Выполнил: <b>' + t.last_modified_by + '</b></span>'; }
-    html += '</div><div class="actions">';
+    html += '<div class="actions">';
     if (!isDone) { html += '<button class="btn-ok" onclick="askComplete(' + t.id + ')">Выполнить</button>'; }
     html += '<button class="btn-del" onclick="askDelete(' + t.id + ')">Удалить</button>';
     html += '</div></div>';
