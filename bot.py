@@ -16,6 +16,7 @@ from aiogram.filters import Command
 from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
+import aiohttp
 from aiohttp import web
 
 import anthropic
