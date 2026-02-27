@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Задачи отделов</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--tg-theme-bg-color,#f4f4f5);color:var(--tg-theme-text-color,#000);min-height:100vh}
+.header{display:flex;align-items:center;gap:12px;padding:16px 20px;background:var(--tg-theme-bg-color,#fff);border-bottom:1px solid var(--tg-theme-hint-color,#e0e0e0);position:sticky;top:0;z-index:10}
+.header h2{font-size:18px;font-weight:700;flex:1}
+.btn-back{background:none;border:none;cursor:pointer;font-size:20px;color:var(--tg-theme-button-color,#3390ec);padding:4px 8px 4px 0}
+.btn-all{padding:8px 14px;border:none;border-radius:10px;cursor:pointer;background:var(--tg-theme-button-color,#3390ec);color:var(--tg-theme-button-text-color,#fff);font-size:14px;font-weight:600}
+.screen{padding:16px 20px}
+.dept-btn{display:block;width:100%;padding:18px;margin-bottom:12px;background:var(--tg-theme-button-color,#3390ec);color:var(--tg-theme-button-text-color,#fff);border:none;border-radius:14px;font-size:17px;font-weight:700;cursor:pointer;text-align:center}
+.toolbar{display:flex;gap:8px;margin-bottom:16px}
+.btn-refresh{padding:10px 16px;border:none;border-radius:10px;cursor:pointer;background:var(--tg-theme-secondary-bg-color,#e8e8e8);color:var(--tg-theme-text-color,#000);font-size:14px}
+.btn-new{flex:1;padding:10px 16px;border:none;border-radius:10px;cursor:pointer;background:var(--tg-theme-button-color,#3390ec);color:var(--tg-theme-button-text-color,#fff);font-size:14px;font-weight:600}
+.loading{text-align:center;padding:40px 20px;color:var(--tg-theme-hint-color,#888)}
+.card{background:var(--tg-theme-bg-color,#fff);border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 1px 6px rgba(0,0,0,0.07)}
+.card.done{opacity:0.6}
+.card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.tag{font-size:12px;font-weight:700;color:var(--tg-theme-button-color,#3390ec);background:rgba(51,144,236,0.1);padding:2px 8px;border-radius:6px}
+.status{font-size:12px;color:var(--tg-theme-hint-color,#888)}
+.title{font-size:16px;font-weight:600;margin-bottom:8px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--tg-theme-hint-color,#888);margin-bottom:10px}
+.actions{display:flex;gap:8px}
+.btn-ok{flex:1;padding:10px;border:none;border-radius:10px;cursor:pointer;background:#34c759;color:#fff;font-size:13px;font-weight:600}
+.btn-del{padding:10px 14px;border:none;border-radius:10px;cursor:pointer;background:var(--tg-theme-secondary-bg-color,#e8e8e8);color:#ff3b30;font-size:13px;font-weight:600}
+.overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px}
+.overlay.show{display:flex}
+.modal{background:var(--tg-theme-bg-color,#fff);border-radius:16px;padding:24px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,0.3)}
+.modal h3{font-size:18px;font-weight:700;margin-bottom:16px}
+.modal input{width:100%;padding:14px 16px;margin-bottom:16px;border:1.5px solid var(--tg-theme-hint-color,#c8c8c8);border-radius:12px;font-size:16px;background:var(--tg-theme-secondary-bg-color,#f4f4f5);color:var(--tg-theme-text-color,#000);outline:none}
+.modal input:focus{border-color:var(--tg-theme-button-color,#3390ec)}
+.modal input.err{border-color:#ff3b30}
+.modal-btns{display:flex;gap:10px}
+.btn-cancel{flex:1;padding:14px;border:none;border-radius:12px;cursor:pointer;background:var(--tg-theme-secondary-bg-color,#e8e8e8);color:var(--tg-theme-text-color,#000);font-size:15px}
+.btn-create{flex:1;padding:14px;border:none;border-radius:12px;cursor:pointer;background:var(--tg-theme-button-color,#3390ec);color:var(--tg-theme-button-text-color,#fff);font-size:15px;font-weight:700}
+.confirm-txt{font-size:15px;margin-bottom:20px;line-height:1.4}
+.btn-yes{flex:1;padding:14px;border:none;border-radius:12px;cursor:pointer;background:#ff3b30;color:#fff;font-size:15px;font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <button class="btn-back" id="btnBack" onclick="showDepts()" style="display:none">&#8592;</button>
+  <h2 id="headerTitle">&#1042;&#1099;&#1073;&#1077;&#1088;&#1080;&#1090;&#1077; &#1086;&#1090;&#1076;&#1077;&#1083;</h2>
+  <button class="btn-all" onclick="openTasks(null)">&#1042;&#1089;&#1077; &#1079;&#1072;&#1076;&#1072;&#1095;&#1080;</button>
+</div>
+
+<div class="screen" id="scrDepts">
+  <button class="dept-btn" onclick="openTasks('Casino')">Casino</button>
+  <button class="dept-btn" onclick="openTasks('Operations')">Operations</button>
+  <button class="dept-btn" onclick="openTasks('Traffic')">Traffic</button>
+  <button class="dept-btn" onclick="openTasks('Product')">Product</button>
+  <button class="dept-btn" onclick="openTasks('Retention')">Retention</button>
+</div>
+
+<div class="screen" id="scrTasks" style="display:none">
+  <div class="toolbar">
+    <button class="btn-refresh" onclick="loadTasks()">&#8635;</button>
+    <button class="btn-new" id="btnNew" onclick="openCreateModal()">+ &#1053;&#1086;&#1074;&#1072;&#1103; &#1079;&#1072;&#1076;&#1072;&#1095;&#1072;</button>
+  </div>
+  <div id="tasksList"></div>
+</div>
+
+<div class="overlay" id="createOverlay">
+  <div class="modal">
+    <h3 id="createTitle">&#1053;&#1086;&#1074;&#1072;&#1103; &#1079;&#1072;&#1076;&#1072;&#1095;&#1072;</h3>
+    <input type="text" id="createInput" placeholder="&#1042;&#1074;&#1077;&#1076;&#1080;&#1090;&#1077; &#1085;&#1072;&#1079;&#1074;&#1072;&#1085;&#1080;&#1077;..."/>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeCreate()">&#1054;&#1090;&#1084;&#1077;&#1085;&#1072;</button>
+      <button class="btn-create" onclick="submitTask()">&#1057;&#1086;&#1079;&#1076;&#1072;&#1090;&#1100;</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="confirmOverlay">
+  <div class="modal">
+    <p class="confirm-txt" id="confirmTxt"></p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeConfirm()">&#1054;&#1090;&#1084;&#1077;&#1085;&#1072;</button>
+      <button class="btn-yes" id="confirmBtn">&#1059;&#1076;&#1072;&#1083;&#1080;&#1090;&#1100;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var API = 'https://worthy-contentment-production.up.railway.app';
+var tg = null;
+try { if (window.Telegram && window.Telegram.WebApp) { tg = window.Telegram.WebApp; tg.expand(); } } catch(e) {}
+var me = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user.first_name : 'Admin';
+var dept = null;
+var store = {};
+
+function showDepts() {
+  dept = null;
+  document.getElementById('headerTitle').textContent = 'Выберите отдел';
+  document.getElementById('btnBack').style.display = 'none';
+  document.getElementById('scrDepts').style.display = 'block';
+  document.getElementById('scrTasks').style.display = 'none';
+}
+
+function openTasks(d) {
+  dept = d;
+  document.getElementById('headerTitle').textContent = d ? ('Задачи: ' + d) : 'Все задачи';
+  document.getElementById('btnBack').style.display = 'block';
+  document.getElementById('btnNew').style.display = d ? 'block' : 'none';
+  document.getElementById('scrDepts').style.display = 'none';
+  document.getElementById('scrTasks').style.display = 'block';
+  loadTasks();
+}
+
+function loadTasks() {
+  var el = document.getElementById('tasksList');
+  el.innerHTML = '<div class="loading">Загрузка...</div>';
+  var url = API + '/api/department-tasks' + (dept ? ('?department=' + encodeURIComponent(dept)) : '');
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(res) { renderTasks(res.tasks || []); })
+    .catch(function(e) { el.innerHTML = '<div class="loading">Ошибка загрузки</div>'; });
+}
+
+function renderTasks(tasks) {
+  var el = document.getElementById('tasksList');
+  store = {};
+  if (!tasks.length) { el.innerHTML = '<div class="loading">Задач пока нет</div>'; return; }
+  var html = '';
+  for (var i = 0; i < tasks.length; i++) {
+    var t = tasks[i];
+    store[t.id] = t.title;
+    var isDone = t.status === 'done';
+    html += '<div class="card' + (isDone ? ' done' : '') + '">';
+    html += '<div class="card-top"><span class="tag">' + t.department + '</span>';
+    html += '<span class="status">' + (isDone ? 'Выполнено' : 'Активна') + '</span></div>';
+    html += '<div class="title">' + t.title + '</div>';
+    html += '<div class="meta"><span>Создал: <b>' + t.author + '</b></span>';
+    if (t.last_modified_by) { html += '<span>Выполнил: <b>' + t.last_modified_by + '</b></span>'; }
+    html += '</div><div class="actions">';
+    if (!isDone) { html += '<button class="btn-ok" onclick="askComplete(' + t.id + ')">Выполнить</button>'; }
+    html += '<button class="btn-del" onclick="askDelete(' + t.id + ')">Удалить</button>';
+    html += '</div></div>';
+  }
+  el.innerHTML = html;
+}
+
+function openCreateModal() {
+  document.getElementById('createTitle').textContent = 'Новая задача: ' + dept;
+  document.getElementById('createInput').value = '';
+  document.getElementById('createInput').classList.remove('err');
+  document.getElementById('createOverlay').classList.add('show');
+  setTimeout(function() { document.getElementById('createInput').focus(); }, 150);
+}
+
+function closeCreate() { document.getElementById('createOverlay').classList.remove('show'); }
+
+function submitTask() {
+  var inp = document.getElementById('createInput');
+  var val = inp.value.trim();
+  if (!val) { inp.classList.add('err'); inp.focus(); return; }
+  fetch(API + '/api/create-department-task', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: val, department: dept, author: me })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.error) { alert('Ошибка: ' + res.error); }
+    else { closeCreate(); loadTasks(); }
+  })
+  .catch(function(e) { alert('Ошибка: ' + e.message); });
+}
+
+function askComplete(id) {
+  document.getElementById('confirmTxt').textContent = 'Отметить задачу как выполненную?';
+  document.getElementById('confirmBtn').textContent = 'Выполнить';
+  document.getElementById('confirmBtn').onclick = function() { doComplete(id); };
+  document.getElementById('confirmOverlay').classList.add('show');
+}
+
+function doComplete(id) {
+  closeConfirm();
+  fetch(API + '/api/department-tasks/' + id + '/complete', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ modified_by: me })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) { if (!res.error) loadTasks(); });
+}
+
+function askDelete(id) {
+  var title = store[id] || 'задачу';
+  document.getElementById('confirmTxt').textContent = 'Удалить задачу "' + title + '"?';
+  document.getElementById('confirmBtn').textContent = 'Удалить';
+  document.getElementById('confirmBtn').onclick = function() { doDelete(id); };
+  document.getElementById('confirmOverlay').classList.add('show');
+}
+
+function doDelete(id) {
+  closeConfirm();
+  fetch(API + '/api/department-tasks/' + id, { method: 'DELETE' })
+  .then(function(r) { return r.json(); })
+  .then(function(res) { if (!res.error) loadTasks(); });
+}
+
+function closeConfirm() { document.getElementById('confirmOverlay').classList.remove('show'); }
+
+document.getElementById('createInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') submitTask();
+});
+</script>
+</body>
+</html>

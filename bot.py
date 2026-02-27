@@ -571,6 +571,10 @@ async def handle_dashboard(request):
     html_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
     return web.FileResponse(html_path)
 
+async def handle_dept_page(request):
+    html_path = os.path.join(os.path.dirname(__file__), "dept.html")
+    return web.FileResponse(html_path)
+
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -704,6 +708,7 @@ async def main():
 
     app = web.Application()
     app.router.add_get("/", handle_dashboard)
+    app.router.add_get("/dept", handle_dept_page)
     app.router.add_get("/api/tasks", handle_api_tasks)
     app.router.add_post("/api/tasks/{id}/complete", handle_api_complete)
     app.router.add_delete("/api/tasks/{id}", handle_api_delete)
