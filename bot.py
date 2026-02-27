@@ -574,9 +574,72 @@ async def handle_dashboard(request):
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "POST, GET, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
 }
+
+
+async def supabase_request(method, path, json_data=None, params=None):
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+    headers = {
+        "Authorization": f"Bearer {supabase_key}",
+        "apikey": supabase_key,
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
+    url = f"{supabase_url}/rest/v1/{path}"
+    async with aiohttp.ClientSession() as session:
+        async with session.request(method, url, json=json_data, params=params, headers=headers) as resp:
+            return resp.status, await resp.json()
+
+
+async def handle_get_department_tasks(request):
+    if request.method == "OPTIONS":
+        return web.Response(headers=CORS_HEADERS)
+    try:
+        department = request.query.get("department")
+        params = {"order": "created_at.desc"}
+        if department:
+            params["department"] = f"eq.{department}"
+        status, data = await supabase_request("GET", "tasks", params=params)
+        return web.json_response({"tasks": data}, headers=CORS_HEADERS)
+    except Exception as e:
+        logger.error(f"get_department_tasks error: {e}")
+        return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
+
+
+async def handle_complete_department_task(request):
+    if request.method == "OPTIONS":
+        return web.Response(headers=CORS_HEADERS)
+    try:
+        task_id = request.match_info["id"]
+        data = await request.json()
+        modified_by = data.get("modified_by", "Unknown")
+        status, result = await supabase_request(
+            "PATCH", f"tasks?id=eq.{task_id}",
+            json_data={"status": "done", "last_modified_by": modified_by}
+        )
+        if status in (200, 201):
+            return web.json_response({"success": True}, headers=CORS_HEADERS)
+        return web.json_response({"error": str(result)}, status=400, headers=CORS_HEADERS)
+    except Exception as e:
+        logger.error(f"complete_department_task error: {e}")
+        return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
+
+
+async def handle_delete_department_task(request):
+    if request.method == "OPTIONS":
+        return web.Response(headers=CORS_HEADERS)
+    try:
+        task_id = request.match_info["id"]
+        status, result = await supabase_request("DELETE", f"tasks?id=eq.{task_id}")
+        if status in (200, 204):
+            return web.json_response({"success": True}, headers=CORS_HEADERS)
+        return web.json_response({"error": str(result)}, status=400, headers=CORS_HEADERS)
+    except Exception as e:
+        logger.error(f"delete_department_task error: {e}")
+        return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
 
 
 async def handle_create_department_task(request):
@@ -646,6 +709,12 @@ async def main():
     app.router.add_delete("/api/tasks/{id}", handle_api_delete)
     app.router.add_post("/api/create-department-task", handle_create_department_task)
     app.router.add_options("/api/create-department-task", handle_create_department_task)
+    app.router.add_get("/api/department-tasks", handle_get_department_tasks)
+    app.router.add_options("/api/department-tasks", handle_get_department_tasks)
+    app.router.add_patch("/api/department-tasks/{id}/complete", handle_complete_department_task)
+    app.router.add_options("/api/department-tasks/{id}/complete", handle_complete_department_task)
+    app.router.add_delete("/api/department-tasks/{id}", handle_delete_department_task)
+    app.router.add_options("/api/department-tasks/{id}", handle_delete_department_task)
 
     runner = web.AppRunner(app)
     await runner.setup()
