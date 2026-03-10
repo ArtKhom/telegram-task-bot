@@ -1,25 +1,20 @@
-import sqlite3
+import os
+import aiosqlite
 from typing import Optional
 
-DB_PATH = "tasks.db"
+# Railway Volume: mount path /data in Railway settings → data persists across redeploys
+DB_PATH = os.getenv("DB_PATH", "/data/tasks.db")
 
 
-def _conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def init():
-    """Create tables if they don't exist."""
-    with _conn() as conn:
-        conn.execute("""
+async def init():
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        conn.execute("""
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
@@ -33,117 +28,124 @@ def init():
                 FOREIGN KEY (user_id) REFERENCES users(user_id)
             )
         """)
-        conn.commit()
+        await conn.commit()
         # Migration: add category column if missing
         try:
-            conn.execute("SELECT category FROM tasks LIMIT 1")
-        except sqlite3.OperationalError:
-            conn.execute("ALTER TABLE tasks ADD COLUMN category TEXT DEFAULT 'personal'")
-            conn.commit()
+            await conn.execute("SELECT category FROM tasks LIMIT 1")
+        except Exception:
+            await conn.execute("ALTER TABLE tasks ADD COLUMN category TEXT DEFAULT 'personal'")
+            await conn.commit()
 
 
-def ensure_user(user_id: int):
-    with _conn() as conn:
-        conn.execute(
-            "INSERT OR IGNORE INTO users (user_id) VALUES (?)",
-            (user_id,)
+async def ensure_user(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute(
+            "INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,)
         )
-        conn.commit()
+        await conn.commit()
 
 
-def add_task(user_id: int, title: str, due_date: str,
-             category: str = "personal", original_text: str = "",
-             remind_before: int = 30) -> int:
-    with _conn() as conn:
-        cursor = conn.execute(
+async def add_task(
+    user_id: int,
+    title: str,
+    due_date: str,
+    category: str = "personal",
+    original_text: str = "",
+    remind_before: int = 30,
+) -> int:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(
             """INSERT INTO tasks (user_id, title, due_date, category, original_text, remind_before)
                VALUES (?, ?, ?, ?, ?, ?)""",
-            (user_id, title, due_date, category, original_text, remind_before)
+            (user_id, title, due_date, category, original_text, remind_before),
         )
-        conn.commit()
+        await conn.commit()
         return cursor.lastrowid
 
 
-def get_task(task_id: int, user_id: int) -> Optional[dict]:
-    with _conn() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-            (task_id, user_id)
-        ).fetchone()
+async def get_task(task_id: int, user_id: int) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id)
+        )
+        row = await cursor.fetchone()
         return dict(row) if row else None
 
 
-def get_active_tasks(user_id: int) -> list[dict]:
-    with _conn() as conn:
-        rows = conn.execute(
-            """SELECT * FROM tasks
-               WHERE user_id = ? AND is_done = 0
-               ORDER BY due_date ASC""",
-            (user_id,)
-        ).fetchall()
-        return [dict(r) for r in rows]
-
-
-def get_done_tasks(user_id: int) -> list[dict]:
-    with _conn() as conn:
-        rows = conn.execute(
-            """SELECT * FROM tasks
-               WHERE user_id = ? AND is_done = 1
-               ORDER BY due_date DESC
-               LIMIT 20""",
-            (user_id,)
-        ).fetchall()
-        return [dict(r) for r in rows]
-
-
-def get_all_active_tasks() -> list[dict]:
-    with _conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE is_done = 0"
-        ).fetchall()
-        return [dict(r) for r in rows]
-
-
-def get_all_tasks_for_user(user_id: int) -> list[dict]:
-    """Get all tasks (active + done) for dashboard."""
-    with _conn() as conn:
-        rows = conn.execute(
-            """SELECT * FROM tasks
-               WHERE user_id = ?
-               ORDER BY is_done ASC, due_date ASC""",
-            (user_id,)
-        ).fetchall()
-        return [dict(r) for r in rows]
-
-
-def mark_done(task_id: int):
-    with _conn() as conn:
-        conn.execute("UPDATE tasks SET is_done = 1 WHERE id = ?", (task_id,))
-        conn.commit()
-
-
-def mark_undone(task_id: int):
-    with _conn() as conn:
-        conn.execute("UPDATE tasks SET is_done = 0 WHERE id = ?", (task_id,))
-        conn.commit()
-
-
-def delete_task(task_id: int, user_id: int):
-    with _conn() as conn:
-        conn.execute("DELETE FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id))
-        conn.commit()
-
-
-def update_task_category(task_id: int, user_id: int, category: str):
-    with _conn() as conn:
-        conn.execute(
-            "UPDATE tasks SET category = ? WHERE id = ? AND user_id = ?",
-            (category, task_id, user_id)
+async def get_active_tasks(user_id: int) -> list:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM tasks WHERE user_id = ? AND is_done = 0 ORDER BY due_date ASC",
+            (user_id,),
         )
-        conn.commit()
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
 
 
-def clear_done_tasks(user_id: int):
-    with _conn() as conn:
-        conn.execute("DELETE FROM tasks WHERE user_id = ? AND is_done = 1", (user_id,))
-        conn.commit()
+async def get_done_tasks(user_id: int) -> list:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM tasks WHERE user_id = ? AND is_done = 1 ORDER BY due_date DESC LIMIT 20",
+            (user_id,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def get_all_active_tasks() -> list:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM tasks WHERE is_done = 0")
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def get_all_tasks_for_user(user_id: int) -> list:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM tasks WHERE user_id = ? ORDER BY is_done ASC, due_date ASC",
+            (user_id,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def mark_done(task_id: int):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("UPDATE tasks SET is_done = 1 WHERE id = ?", (task_id,))
+        await conn.commit()
+
+
+async def mark_undone(task_id: int):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("UPDATE tasks SET is_done = 0 WHERE id = ?", (task_id,))
+        await conn.commit()
+
+
+async def delete_task(task_id: int, user_id: int):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute(
+            "DELETE FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id)
+        )
+        await conn.commit()
+
+
+async def update_task_category(task_id: int, user_id: int, category: str):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute(
+            "UPDATE tasks SET category = ? WHERE id = ? AND user_id = ?",
+            (category, task_id, user_id),
+        )
+        await conn.commit()
+
+
+async def clear_done_tasks(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute(
+            "DELETE FROM tasks WHERE user_id = ? AND is_done = 1", (user_id,)
+        )
+        await conn.commit()

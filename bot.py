@@ -84,7 +84,7 @@ async def parse_message_with_ai(user_text, current_time, active_tasks):
         tasks_list = "  (no active tasks)"
 
     response = await claude.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=500,
         system=f"""You are a task manager AI. Current time: {current_time}. Timezone: {TIMEZONE}.
 
@@ -183,7 +183,7 @@ def format_reminders_text(remind_minutes_list):
 # --- Commands ---
 @router.message(Command("start"))
 async def cmd_start(message: Message):
-    db.ensure_user(message.from_user.id)
+    await db.ensure_user(message.from_user.id)
     text = (
         "👋 Привіт! Я твій AI-менеджер задач.\n\n"
         "Просто напиши задачу:\n"
@@ -239,7 +239,7 @@ async def cmd_dashboard(message: Message):
 
 @router.message(Command("tasks"))
 async def cmd_tasks(message: Message):
-    tasks = db.get_active_tasks(message.from_user.id)
+    tasks = await db.get_active_tasks(message.from_user.id)
     if not tasks:
         await message.answer("✅ Задач немає. Напиши мені нову!")
         return
@@ -254,7 +254,7 @@ async def cmd_tasks(message: Message):
 
 @router.message(Command("done"))
 async def cmd_done(message: Message):
-    tasks = db.get_done_tasks(message.from_user.id)
+    tasks = await db.get_done_tasks(message.from_user.id)
     if not tasks:
         await message.answer("Поки немає завершених задач.")
         return
@@ -267,7 +267,7 @@ async def cmd_done(message: Message):
 
 @router.message(Command("clear"))
 async def cmd_clear(message: Message):
-    db.clear_done_tasks(message.from_user.id)
+    await db.clear_done_tasks(message.from_user.id)
     await message.answer("🗑 Видалено завершені задачі.")
 
 
@@ -275,9 +275,9 @@ async def cmd_clear(message: Message):
 async def cmd_delete_task(message: Message):
     try:
         task_id = int(message.text.split("_")[1])
-        task = db.get_task(task_id, message.from_user.id)
+        task = await db.get_task(task_id, message.from_user.id)
         if task:
-            db.mark_done(task_id)
+            await db.mark_done(task_id)
             remove_all_reminders(task_id)
             await message.answer(f"✅ «{task['title']}» — завершено!")
         else:
@@ -290,9 +290,9 @@ async def cmd_delete_task(message: Message):
 @router.callback_query(F.data.startswith("done:"))
 async def cb_done(callback: CallbackQuery):
     task_id = int(callback.data.split(":")[1])
-    task = db.get_task(task_id, callback.from_user.id)
+    task = await db.get_task(task_id, callback.from_user.id)
     if task:
-        db.mark_done(task_id)
+        await db.mark_done(task_id)
         remove_all_reminders(task_id)
         await callback.message.edit_text(f"✅ «{task['title']}» — завершено!", parse_mode=ParseMode.HTML)
     await callback.answer()
@@ -301,7 +301,7 @@ async def cb_done(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("snooze:"))
 async def cb_snooze(callback: CallbackQuery):
     task_id = int(callback.data.split(":")[1])
-    task = db.get_task(task_id, callback.from_user.id)
+    task = await db.get_task(task_id, callback.from_user.id)
     if task:
         new_time = get_now() + timedelta(minutes=30)
         schedule_single_reminder(task_id, callback.from_user.id, task["title"], new_time, "snooze")
@@ -337,7 +337,7 @@ async def cb_time_select(callback: CallbackQuery):
 
 # --- Reminder system ---
 async def send_reminder(task_id, user_id, title):
-    task = db.get_task(task_id, user_id)
+    task = await db.get_task(task_id, user_id)
     if not task or task["is_done"]:
         return
     cat = CATEGORIES.get(task.get("category","personal"), CATEGORIES["personal"])
@@ -383,7 +383,7 @@ async def save_and_confirm_task(user_id, title, due_date, category, task_type, o
     cat = CATEGORIES[category]
     remind_minutes = REMINDER_PRESETS.get(task_type, REMINDER_PRESETS["default"])
 
-    task_id = db.add_task(user_id=user_id, title=title, due_date=due_date,
+    task_id = await db.add_task(user_id=user_id, title=title, due_date=due_date,
         category=category, original_text=original_text, remind_before=remind_minutes[0])
 
     due_dt = datetime.strptime(due_date, "%Y-%m-%d %H:%M").replace(tzinfo=TZ)
@@ -402,7 +402,7 @@ async def save_and_confirm_task(user_id, title, due_date, category, task_type, o
 # --- Main handler ---
 @router.message(F.text)
 async def handle_text(message: Message):
-    db.ensure_user(message.from_user.id)
+    await db.ensure_user(message.from_user.id)
     user_text = message.text.strip()
     user_id = message.from_user.id
 
@@ -426,7 +426,7 @@ async def handle_text(message: Message):
 
     try:
         now = get_now().strftime("%Y-%m-%d %H:%M, %A")
-        active_tasks = db.get_active_tasks(user_id)
+        active_tasks = await db.get_active_tasks(user_id)
         parsed = await parse_message_with_ai(user_text, now, active_tasks)
         intent = parsed.get("intent", "create")
 
@@ -470,9 +470,9 @@ async def handle_text(message: Message):
             task_ids = parsed.get("task_ids", [])
             completed = []
             for tid in task_ids:
-                task = db.get_task(tid, user_id)
+                task = await db.get_task(tid, user_id)
                 if task and not task["is_done"]:
-                    db.mark_done(tid)
+                    await db.mark_done(tid)
                     remove_all_reminders(tid)
                     completed.append(task["title"])
             if completed:
@@ -481,10 +481,10 @@ async def handle_text(message: Message):
                 await message.answer("🤔 Не знайшов таких задач.")
 
         elif intent == "complete_all":
-            tasks = db.get_active_tasks(user_id)
+            tasks = await db.get_active_tasks(user_id)
             if tasks:
                 for t in tasks:
-                    db.mark_done(t["id"])
+                    await db.mark_done(t["id"])
                     remove_all_reminders(t["id"])
                 await message.answer(f"✅ Всі {len(tasks)} задач завершено!")
             else:
@@ -494,9 +494,9 @@ async def handle_text(message: Message):
             task_ids = parsed.get("task_ids", [])
             deleted = []
             for tid in task_ids:
-                task = db.get_task(tid, user_id)
+                task = await db.get_task(tid, user_id)
                 if task:
-                    db.delete_task(tid, user_id)
+                    await db.delete_task(tid, user_id)
                     remove_all_reminders(tid)
                     deleted.append(task["title"])
             if deleted:
@@ -505,10 +505,10 @@ async def handle_text(message: Message):
                 await message.answer("🤔 Не знайшов таких задач.")
 
         elif intent == "delete_all":
-            tasks = db.get_active_tasks(user_id)
+            tasks = await db.get_active_tasks(user_id)
             if tasks:
                 for t in tasks:
-                    db.delete_task(t["id"], user_id)
+                    await db.delete_task(t["id"], user_id)
                     remove_all_reminders(t["id"])
                 await message.answer(f"🗑 Видалено всі {len(tasks)} задач.")
             else:
@@ -529,7 +529,7 @@ async def handle_text(message: Message):
 
 # --- Reschedule on startup ---
 async def reschedule_all():
-    tasks = db.get_all_active_tasks()
+    tasks = await db.get_all_active_tasks()
     current = get_now()
     for t in tasks:
         due_dt = datetime.strptime(t["due_date"], "%Y-%m-%d %H:%M").replace(tzinfo=TZ)
@@ -546,25 +546,25 @@ async def handle_api_tasks(request):
     user_id = request.query.get("user_id")
     if not user_id:
         return web.json_response({"error": "user_id required"}, status=400)
-    tasks = db.get_all_tasks_for_user(int(user_id))
+    tasks = await db.get_all_tasks_for_user(int(user_id))
     return web.json_response({"tasks": tasks, "categories": CATEGORIES})
 
 async def handle_api_complete(request):
     task_id = int(request.match_info["id"])
     user_id = int(request.query.get("user_id", 0))
-    task = db.get_task(task_id, user_id)
+    task = await db.get_task(task_id, user_id)
     if task:
         if task["is_done"]:
-            db.mark_undone(task_id)
+            await db.mark_undone(task_id)
         else:
-            db.mark_done(task_id)
+            await db.mark_done(task_id)
             remove_all_reminders(task_id)
     return web.json_response({"ok": True})
 
 async def handle_api_delete(request):
     task_id = int(request.match_info["id"])
     user_id = int(request.query.get("user_id", 0))
-    db.delete_task(task_id, user_id)
+    await db.delete_task(task_id, user_id)
     remove_all_reminders(task_id)
     return web.json_response({"ok": True})
 
@@ -702,7 +702,7 @@ async def handle_create_department_task(request):
 
 # --- Main ---
 async def main():
-    db.init()
+    await db.init()
     dp.include_router(router)
     scheduler.start()
     await reschedule_all()
