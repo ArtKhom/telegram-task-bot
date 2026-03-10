@@ -84,7 +84,7 @@ async def parse_message_with_ai(user_text, current_time, active_tasks):
         tasks_list = "  (no active tasks)"
 
     response = await claude.messages.create(
-        model="claude-sonnet-4-6",
+        model="claude-haiku-4-5-20251001",
         max_tokens=500,
         system=f"""You are a task manager AI. Current time: {current_time}. Timezone: {TIMEZONE}.
 
